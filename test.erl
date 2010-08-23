@@ -1,5 +1,5 @@
 -module(test).
--export([start/0, test/0, get_remote_server/0]).
+-export([start/0, test/0, get_remote_server/0, get_echo_server/0]).
 
 timeit(Msg, Fun, Ntimes) ->
     L = lists:seq(1, Ntimes),
@@ -11,6 +11,17 @@ timeit(Msg, Fun, Ntimes) ->
 get_remote_server() ->
     {ok, Pid} = gen_server:start(test_server, [], []),
     Pid.
+
+get_echo_server() ->
+    Pid = spawn(fun echo/0),
+    Pid.
+
+echo() ->
+    receive
+        {From, X} ->
+            From ! X,
+            echo()
+    end.
 
 start() ->
     receive
@@ -59,8 +70,11 @@ test() ->
     Ntimes = 100000,
     {ok, Pid} = gen_server:start(test_server, [], []),
     RemotePid = rpc:call(list_to_atom("test1@127.0.0.1"), test, get_remote_server, []),
+    LocalEcho = get_echo_server(),
+    RemoteEcho = rpc:call(list_to_atom("test1@127.0.0.1"), test, get_echo_server, []),
     timeit("call fun0", fun() -> test_server:fun0() end, Ntimes),
     timeit("call fun1", fun() -> test_server:fun1("Hello") end, Ntimes),
+    timeit("send/receive local", fun () -> LocalEcho ! {self(), x}, receive x -> ok end end, Ntimes),
     timeit("gen_server:call fun0 local", fun() -> gen_server:call(Pid, fun0) end, Ntimes),
     timeit("gen_server:call fun1 local", fun() -> gen_server:call(Pid, {fun1, "Hello"}) end, Ntimes),
     timeit("gen_server:call fun0 local 10 proc", fun() ->
@@ -76,6 +90,7 @@ test() ->
     timeit("gen_server:call fun1_spawn local 100 proc", fun() ->
                                                                do_parallel(100, Ntimes div 100, fun () -> gen_server:call(Pid, fun1_spawn) end)
                                                        end, 1),
+    timeit("send/receive remote", fun () -> RemoteEcho ! {self(), x}, receive x -> ok end end, Ntimes),
     timeit("gen_server:call fun0 remote", fun() -> gen_server:call(RemotePid, fun0) end, Ntimes),
     timeit("gen_server:call fun0 remote 10 proc", fun() ->
                                                           do_parallel(10, Ntimes div 10, fun () -> gen_server:call(RemotePid, fun0) end)
