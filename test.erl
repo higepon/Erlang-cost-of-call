@@ -74,6 +74,7 @@ test() ->
     RemoteEcho = rpc:call(list_to_atom("test1@127.0.0.1"), test, get_echo_server, []),
     timeit("call fun0", fun() -> test_server:fun0() end, Ntimes),
     timeit("call fun1", fun() -> test_server:fun1("Hello") end, Ntimes),
+    timeit("empty local", fun () -> ok end, Ntimes),
     timeit("send/receive local", fun () -> LocalEcho ! {self(), x}, receive x -> ok end end, Ntimes),
     timeit("gen_server:call fun0 local", fun() -> gen_server:call(Pid, fun0) end, Ntimes),
     timeit("gen_server:call fun1 local", fun() -> gen_server:call(Pid, {fun1, "Hello"}) end, Ntimes),
